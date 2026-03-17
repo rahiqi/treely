@@ -16,3 +16,24 @@ body {
 .f3 {
   border-radius: 0.75rem;
 }
+
+/* Edit form beside the tree as a right-side overlay (not beneath) */
+#family-chart-mount {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+#family-chart-mount > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+#family-chart-mount > *:not(:first-child) {
+  width: 340px;
+  max-width: 38%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: #2d2d2d;
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
