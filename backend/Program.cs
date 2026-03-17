@@ -37,7 +37,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(builder.Configuration["Cors:Origins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new[] { "http://localhost:5173", "http://localhost:3000", "http://localhost", "http://localhost:80" })
+        policy.WithOrigins(builder.Configuration["Cors:Origins"]?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? new[] { "http://localhost:5173", "http://localhost:3000", "http://localhost", "http://localhost:80","http://192.168.100.28:801" })
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
