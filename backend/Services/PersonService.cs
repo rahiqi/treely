@@ -173,4 +173,74 @@ public class PersonService
         var p = await _db.Persons.AsNoTracking().FirstOrDefaultAsync(x => x.Id == personId, ct);
         return p?.TreeId;
     }
+
+    /// <summary>Replace entire tree with chart data from EditTree.exportData().</summary>
+    public async Task<List<FamilyChartNode>> ReplaceChartDataAsync(int treeId, List<ChartNodeInput> nodes, CancellationToken ct = default)
+    {
+        var personIds = await _db.Persons.Where(p => p.TreeId == treeId).Select(p => p.Id).ToListAsync(ct);
+        if (personIds.Count > 0)
+        {
+            await _db.PersonRelations.Where(r => personIds.Contains(r.ParentId) || personIds.Contains(r.ChildId)).ExecuteDeleteAsync(ct);
+            await _db.PersonSpouses.Where(s => personIds.Contains(s.PersonId) || personIds.Contains(s.SpouseId)).ExecuteDeleteAsync(ct);
+            await _db.PersonProfiles.Where(pr => personIds.Contains(pr.PersonId)).ExecuteDeleteAsync(ct);
+            await _db.Photos.Where(ph => personIds.Contains(ph.PersonId)).ExecuteDeleteAsync(ct);
+            await _db.Persons.Where(p => p.TreeId == treeId).ExecuteDeleteAsync(ct);
+        }
+
+        if (nodes.Count == 0)
+            return new List<FamilyChartNode>();
+
+        var idToPerson = new Dictionary<string, Person>(StringComparer.OrdinalIgnoreCase);
+        foreach (var n in nodes)
+        {
+            var data = n.Data ?? new Dictionary<string, object>();
+            var person = new Person
+            {
+                TreeId = treeId,
+                ExternalId = n.Id,
+                FirstName = GetString(data, "first name") ?? "",
+                LastName = GetString(data, "last name") ?? "",
+                Gender = GetString(data, "gender") ?? "M",
+                Birthday = GetString(data, "birthday"),
+                DeathDate = GetString(data, "death"),
+                AvatarUrl = GetString(data, "avatar"),
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            _db.Persons.Add(person);
+            idToPerson[n.Id] = person;
+        }
+        await _db.SaveChangesAsync(ct);
+
+        foreach (var n in nodes)
+        {
+            if (!idToPerson.TryGetValue(n.Id, out var person)) continue;
+            var rels = n.Rels ?? new ChartRelsInput(null, null, null);
+            foreach (var parentId in rels.Parents ?? Array.Empty<string>())
+            {
+                if (idToPerson.TryGetValue(parentId, out var parent))
+                    _db.PersonRelations.Add(new PersonRelation { ParentId = parent.Id, ChildId = person.Id });
+            }
+            foreach (var childId in rels.Children ?? Array.Empty<string>())
+            {
+                if (idToPerson.TryGetValue(childId, out var child))
+                    _db.PersonRelations.Add(new PersonRelation { ParentId = person.Id, ChildId = child.Id });
+            }
+            foreach (var spouseId in rels.Spouses ?? Array.Empty<string>())
+            {
+                if (idToPerson.TryGetValue(spouseId, out var spouse) && spouse.Id != person.Id)
+                    _db.PersonSpouses.Add(new PersonSpouse { PersonId = person.Id, SpouseId = spouse.Id });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        return await GetTreeDataForChartAsync(treeId, ct);
+    }
+
+    private static string? GetString(Dictionary<string, object> data, string key)
+    {
+        if (data.TryGetValue(key, out var v) && v != null)
+            return v.ToString();
+        return null;
+    }
 }

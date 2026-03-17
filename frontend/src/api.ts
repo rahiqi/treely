@@ -72,6 +72,13 @@ export type FamilyChartNode = { id: string; data: Record<string, unknown>; rels:
 export function getTreeChart(treeId: number) {
   return api<FamilyChartNode[]>(`/api/trees/${treeId}/chart`);
 }
+/** Save full tree from EditTree.exportData(); returns updated chart data. */
+export function putTreeChart(treeId: number, nodes: FamilyChartNode[]) {
+  return api<FamilyChartNode[]>(`/api/trees/${treeId}/chart`, {
+    method: 'PUT',
+    body: JSON.stringify(nodes),
+  });
+}
 
 // Persons
 export type PersonDto = {

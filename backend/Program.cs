@@ -104,11 +104,12 @@ app.MapGet("/api/trees", async (HttpContext ctx, TreeService treeService, Cancel
     return Results.Ok(list);
 }).RequireAuthorization();
 
-app.MapPost("/api/trees", async (CreateTreeRequest req, HttpContext ctx, TreeService treeService, CancellationToken ct) =>
+app.MapPost("/api/trees", async (CreateTreeRequest req, HttpContext ctx, TreeService treeService, Treely.Api.Data.AppDbContext db, CancellationToken ct) =>
 {
     var userId = ctx.User.GetUserId();
     if (userId == null) return Results.Unauthorized();
-    var tree = await treeService.CreateTreeAsync(req, userId.Value, ct);
+    var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+    var tree = await treeService.CreateTreeAsync(req, userId.Value, user?.DisplayName, ct);
     return Results.Created($"/api/trees/{tree?.Id}", tree);
 }).RequireAuthorization();
 
@@ -127,6 +128,16 @@ app.MapGet("/api/trees/{treeId:int}/chart", async (int treeId, HttpContext ctx, 
     if (userId == null) return Results.Unauthorized();
     if (!await treeService.CanViewAsync(treeId, userId.Value, ct)) return Results.NotFound();
     var data = await personService.GetTreeDataForChartAsync(treeId, ct);
+    return Results.Ok(data);
+}).RequireAuthorization();
+
+// Replace full tree (from EditTree.exportData()) – Creator/Contributor only
+app.MapPut("/api/trees/{treeId:int}/chart", async (int treeId, List<ChartNodeInput> nodes, HttpContext ctx, TreeService treeService, PersonService personService, CancellationToken ct) =>
+{
+    var userId = ctx.User.GetUserId();
+    if (userId == null) return Results.Unauthorized();
+    if (!await treeService.CanEditAsync(treeId, userId.Value, ct)) return Results.Forbid();
+    var data = await personService.ReplaceChartDataAsync(treeId, nodes ?? new List<ChartNodeInput>(), ct);
     return Results.Ok(data);
 }).RequireAuthorization();
 

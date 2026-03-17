@@ -22,7 +22,7 @@ public class TreeService
         return new TreeDto(tree.Id, tree.Name, tree.Description, tree.CreatedAtUtc, member.Role.ToString());
     }
 
-    public async Task<TreeDto?> CreateTreeAsync(CreateTreeRequest req, int userId, CancellationToken ct = default)
+    public async Task<TreeDto?> CreateTreeAsync(CreateTreeRequest req, int userId, string? creatorDisplayName, CancellationToken ct = default)
     {
         var tree = new Tree
         {
@@ -40,7 +40,31 @@ public class TreeService
             JoinedAtUtc = DateTime.UtcNow
         });
         await _db.SaveChangesAsync(ct);
+
+        // Seed tree with creator as the root person (like tree builder starting point)
+        var (firstName, lastName) = SplitDisplayName(creatorDisplayName ?? "Me");
+        var creatorPerson = new Person
+        {
+            TreeId = tree.Id,
+            ExternalId = "1",
+            FirstName = firstName,
+            LastName = lastName,
+            Gender = "M",
+            Birthday = null,
+            AvatarUrl = "https://static8.depositphotos.com/1009634/988/v/950/depositphotos_9883921-stock-illustration-no-user-profile-picture.jpg",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        _db.Persons.Add(creatorPerson);
+        await _db.SaveChangesAsync(ct);
+
         return new TreeDto(tree.Id, tree.Name, tree.Description, tree.CreatedAtUtc, nameof(TreeRole.Creator));
+    }
+
+    private static (string First, string Last) SplitDisplayName(string displayName)
+    {
+        var parts = (displayName ?? "").Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? (parts[0], parts[1]) : (parts.Length == 1 ? parts[0] : "Me", "");
     }
 
     public async Task<List<TreeDto>> GetMyTreesAsync(int userId, CancellationToken ct = default)

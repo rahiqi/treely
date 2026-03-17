@@ -4,6 +4,10 @@ namespace Treely.Api.DTOs;
 public record FamilyChartNode(string Id, Dictionary<string, object> Data, FamilyChartRels Rels);
 public record FamilyChartRels(string[] Parents, string[] Spouses, string[] Children);
 
+/// <summary>Payload for PUT chart: full tree from EditTree.exportData().</summary>
+public record ChartNodeInput(string Id, Dictionary<string, object> Data, ChartRelsInput Rels);
+public record ChartRelsInput(string[]? Parents, string[]? Spouses, string[]? Children);
+
 public record PersonDto(
     int Id,
     string ExternalId,
