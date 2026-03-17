@@ -61,13 +61,13 @@ app.MapPost("/api/auth/register", async (RegisterRequest req, AuthService auth, 
 {
     var result = await auth.RegisterAsync(req, ct);
     return result is not null ? Results.Ok(result) : Results.Conflict("Email already registered");
-}).WithOpenApi().AllowAnonymous();
+}).AllowAnonymous();
 
 app.MapPost("/api/auth/login", async (LoginRequest req, AuthService auth, CancellationToken ct) =>
 {
     var result = await auth.LoginAsync(req, ct);
     return result is not null ? Results.Ok(result) : Results.Unauthorized();
-}).WithOpenApi().AllowAnonymous();
+}).AllowAnonymous();
 
 // Trees
 app.MapGet("/api/trees", async (HttpContext ctx, TreeService treeService, CancellationToken ct) =>
