@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Swashbuckle.AspNetCore;
 using Treely.Api.Data;
 using Treely.Api.DTOs;
 using Treely.Api.Extensions;

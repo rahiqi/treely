@@ -27,7 +27,8 @@ cd backend
 dotnet run
 ```
 
-API: `http://localhost:5271` (see `backend/Properties/launchSettings.json`).
+API: `http://localhost:5271` (see `backend/Properties/launchSettings.json`).  
+**Swagger UI**: `http://localhost:5271/swagger` — use it to call the API (e.g. register, login, then **Authorize** with the token, then add people).
 
 ### Frontend
 
@@ -43,8 +44,8 @@ Open `http://localhost:5173`. Set `VITE_API_URL=http://localhost:5271` if the AP
 
 1. Register a user.
 2. Create a tree (you become the **Creator**).
-3. Use the API (e.g. Postman) to add persons to the tree until the UI supports “Add person”:
-   - `POST /api/trees/{treeId}/persons` with body: `{ "firstName", "lastName", "gender": "M"|"F", "birthday?", "deathDate?", "avatarUrl?", "parentIds?", "spouseIds?", "childIds?" }`.
+3. Use **Swagger UI** at `/swagger` or the in-app form to add persons to the tree until the UI supports “Add person”:
+   - Body: `{ "firstName": "Jane", "lastName": "Doe", "gender": "F" }`.
 4. Open the tree and click a person to open their profile (biography and photo album).
 
 ## Run with Docker
