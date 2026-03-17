@@ -4,7 +4,7 @@ import * as f3 from 'family-chart';
 import 'family-chart/dist/styles/family-chart.css';
 import { useAuth } from '../contexts/AuthContext';
 import { getTree, getTreeChart, createPerson } from '../api';
-import type { FamilyChartNode } from '../api';
+
 
 export default function TreeView() {
   const { treeId } = useParams<{ treeId: string }>();
