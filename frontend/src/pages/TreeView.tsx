@@ -119,14 +119,19 @@ export default function TreeView() {
       .setOnHoverPathToMain();
 
     if (canEdit) {
-      const editTree = chart
-        .editTree()
-        .fixed()
+      const editTreeApi = chart.editTree();
+      // Library expects .fixed(true) for edit form panel; TS defs say no args
+      (editTreeApi as { fixed: (b?: boolean) => typeof editTreeApi }).fixed(true);
+      const editTree = editTreeApi
         .setFields(['first name', 'last name', 'birthday', 'avatar'])
         .setEditFirst(true)
         .setCardClickOpen(f3Card)
         .setEdit();
       editTreeRef.current = editTree;
+      // Create modal DOM so the edit form can be shown
+      if ('setupModal' in editTree && typeof (editTree as { setupModal: () => void }).setupModal === 'function') {
+        (editTree as { setupModal: () => void }).setupModal();
+      }
     } else {
       editTreeRef.current = null;
     }
@@ -134,7 +139,13 @@ export default function TreeView() {
     chart.updateTree({ initial: true });
 
     if (canEdit && editTreeRef.current) {
-      editTreeRef.current.open(chart.getMainDatum());
+      const mainDatum = chart.getMainDatum();
+      if (mainDatum) {
+        // Defer so chart has painted and form container exists
+        requestAnimationFrame(() => {
+          editTreeRef.current?.open(mainDatum);
+        });
+      }
     }
 
     if (!canEdit) {
@@ -203,12 +214,13 @@ export default function TreeView() {
           </div>
         ) : (
           <div
-            className="f3 w-full rounded-xl overflow-hidden border border-bark-200"
+            className="f3 w-full rounded-xl border border-bark-200"
             style={{
               height: 'calc(100vh - 12rem)',
               minHeight: 500,
               backgroundColor: 'rgb(33,33,33)',
               color: '#fff',
+              position: 'relative',
             }}
           >
             <div id="family-chart-mount" className="w-full h-full" />
