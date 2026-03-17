@@ -141,6 +141,25 @@ app.MapPut("/api/trees/{treeId:int}/chart", async (int treeId, List<ChartNodeInp
     return Results.Ok(data);
 }).RequireAuthorization();
 
+// Tree members – list (any member), add (Creator only)
+app.MapGet("/api/trees/{treeId:int}/members", async (int treeId, HttpContext ctx, TreeService treeService, CancellationToken ct) =>
+{
+    var userId = ctx.User.GetUserId();
+    if (userId == null) return Results.Unauthorized();
+    var list = await treeService.GetMembersAsync(treeId, userId.Value, ct);
+    return Results.Ok(list);
+}).RequireAuthorization();
+
+app.MapPost("/api/trees/{treeId:int}/members", async (int treeId, AddTreeMemberRequest req, HttpContext ctx, TreeService treeService, CancellationToken ct) =>
+{
+    var userId = ctx.User.GetUserId();
+    if (userId == null) return Results.Unauthorized();
+    var (ok, error) = await treeService.AddMemberAsync(treeId, req.Email, req.Role, userId.Value, ct);
+    if (!ok) return string.IsNullOrEmpty(error) ? Results.Forbid() : Results.BadRequest(new { message = error });
+    var members = await treeService.GetMembersAsync(treeId, userId.Value, ct);
+    return Results.Ok(members);
+}).RequireAuthorization();
+
 // Persons
 app.MapGet("/api/persons/{personId:int}", async (int personId, HttpContext ctx, PersonService personService, TreeService treeService, CancellationToken ct) =>
 {

@@ -93,4 +93,46 @@ public class TreeService
         return await _db.TreeMembers.AnyAsync(m =>
             m.TreeId == treeId && m.UserId == userId && m.Role == TreeRole.Creator, ct);
     }
+
+    /// <summary>Add a member by email. Only Creator can add. User must already be registered.</summary>
+    public async Task<(bool Ok, string? Error)> AddMemberAsync(int treeId, string email, string role, int invitedByUserId, CancellationToken ct = default)
+    {
+        if (!await IsCreatorAsync(treeId, invitedByUserId, ct))
+            return (false, "Only the tree creator can add members.");
+        if (string.IsNullOrWhiteSpace(email))
+            return (false, "Email is required.");
+        var roleTrim = (role ?? "").Trim();
+        if (roleTrim != nameof(TreeRole.Contributor) && roleTrim != nameof(TreeRole.Visitor))
+            return (false, "Role must be Contributor or Visitor.");
+        var targetUser = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email.Trim(), ct);
+        if (targetUser == null)
+            return (false, "No user found with that email. They must register first.");
+        var alreadyMember = await _db.TreeMembers.AnyAsync(m => m.TreeId == treeId && m.UserId == targetUser.Id, ct);
+        if (alreadyMember)
+            return (false, "That user is already a member of this tree.");
+        var treeRole = roleTrim == nameof(TreeRole.Contributor) ? TreeRole.Contributor : TreeRole.Visitor;
+        _db.TreeMembers.Add(new TreeMember
+        {
+            TreeId = treeId,
+            UserId = targetUser.Id,
+            Role = treeRole,
+            JoinedAtUtc = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    public async Task<List<TreeMemberDto>> GetMembersAsync(int treeId, int userId, CancellationToken ct = default)
+    {
+        if (!await CanViewAsync(treeId, userId, ct))
+            return new List<TreeMemberDto>();
+        return await _db.TreeMembers
+            .AsNoTracking()
+            .Where(m => m.TreeId == treeId)
+            .Include(m => m.User)
+            .OrderBy(m => m.Role == TreeRole.Creator ? 0 : m.Role == TreeRole.Contributor ? 1 : 2)
+            .ThenBy(m => m.User.DisplayName)
+            .Select(m => new TreeMemberDto(m.UserId, m.User.Email, m.User.DisplayName, m.Role.ToString(), m.JoinedAtUtc))
+            .ToListAsync(ct);
+    }
 }

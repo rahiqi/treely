@@ -3,8 +3,8 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import * as f3 from 'family-chart';
 import 'family-chart/styles/family-chart.css';
 import { useAuth } from '../contexts/AuthContext';
-import { getTree, getTreeChart, putTreeChart } from '../api';
-import type { FamilyChartNode } from '../api';
+import { getTree, getTreeChart, putTreeChart, getTreeMembers, addTreeMember } from '../api';
+import type { FamilyChartNode, TreeMemberDto } from '../api';
 
 export default function TreeView() {
   const { treeId } = useParams<{ treeId: string }>();
@@ -18,7 +18,14 @@ export default function TreeView() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [treeName, setTreeName] = useState('');
   const [canEdit, setCanEdit] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
   const [chartNodes, setChartNodes] = useState<FamilyChartNode[]>([]);
+  const [showManageAccess, setShowManageAccess] = useState(false);
+  const [members, setMembers] = useState<TreeMemberDto[]>([]);
+  const [memberError, setMemberError] = useState('');
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberRole, setAddMemberRole] = useState<'Contributor' | 'Visitor'>('Visitor');
+  const [addingMember, setAddingMember] = useState(false);
   const id = treeId ? parseInt(treeId, 10) : NaN;
 
   const refreshTree = useCallback(() => {
@@ -30,6 +37,7 @@ export default function TreeView() {
       .then(([tree, chartData]) => {
         setTreeName(tree.name);
         setCanEdit(tree.yourRole === 'Creator' || tree.yourRole === 'Contributor');
+        setIsCreator(tree.yourRole === 'Creator');
         const map = new Map<string, number>();
         chartData.forEach((n) => {
           const pid = (n.data as { personId?: number }).personId;
@@ -48,6 +56,34 @@ export default function TreeView() {
     if (!id || isNaN(id)) return;
     refreshTree();
   }, [id, refreshTree]);
+
+  const loadMembers = useCallback(() => {
+    if (!id || isNaN(id)) return;
+    getTreeMembers(id)
+      .then(setMembers)
+      .catch(() => setMembers([]));
+  }, [id]);
+
+  useEffect(() => {
+    if (showManageAccess && id && !isNaN(id)) loadMembers();
+  }, [showManageAccess, id, loadMembers]);
+
+  const handleAddMember = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!id || !addMemberEmail.trim()) return;
+      setMemberError('');
+      setAddingMember(true);
+      addTreeMember(id, addMemberEmail.trim(), addMemberRole)
+        .then((updated) => {
+          setMembers(updated);
+          setAddMemberEmail('');
+        })
+        .catch((err) => setMemberError(err instanceof Error ? err.message : 'Failed to add member'))
+        .finally(() => setAddingMember(false));
+    },
+    [id, addMemberEmail, addMemberRole]
+  );
 
   const navigateToPerson = useCallback(
     (personId: number) => {
@@ -185,6 +221,15 @@ export default function TreeView() {
             <h1 className="text-xl font-semibold text-bark-900">{treeName || 'Tree'}</h1>
           </div>
           <div className="flex items-center gap-3">
+            {isCreator && (
+              <button
+                type="button"
+                onClick={() => setShowManageAccess(true)}
+                className="px-4 py-2 border border-bark-300 text-bark-700 rounded-lg hover:bg-bark-50 text-sm"
+              >
+                Manage access
+              </button>
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -227,6 +272,60 @@ export default function TreeView() {
           </div>
         )}
       </main>
+
+      {showManageAccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowManageAccess(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-bark-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-bark-900">Manage access</h2>
+              <button type="button" onClick={() => setShowManageAccess(false)} className="text-bark-500 hover:text-bark-700 text-xl leading-none">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-sm text-bark-600 mb-4">Add someone by their account email. They must already be registered.</p>
+              {memberError && <div className="mb-3 p-2 rounded bg-red-50 text-red-700 text-sm">{memberError}</div>}
+              <form onSubmit={handleAddMember} className="flex flex-wrap gap-2 items-end mb-6">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block text-sm font-medium text-bark-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={addMemberEmail}
+                    onChange={(e) => setAddMemberEmail(e.target.value)}
+                    placeholder="colleague@example.com"
+                    className="w-full px-3 py-2 border border-bark-300 rounded-lg text-sm"
+                    required
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="block text-sm font-medium text-bark-700 mb-1">Role</label>
+                  <select
+                    value={addMemberRole}
+                    onChange={(e) => setAddMemberRole(e.target.value as 'Contributor' | 'Visitor')}
+                    className="w-full px-3 py-2 border border-bark-300 rounded-lg text-sm"
+                  >
+                    <option value="Visitor">Visitor</option>
+                    <option value="Contributor">Contributor</option>
+                  </select>
+                </div>
+                <button type="submit" disabled={addingMember} className="px-4 py-2 bg-leaf-600 text-white rounded-lg hover:bg-leaf-700 disabled:opacity-50 text-sm">
+                  {addingMember ? 'Adding…' : 'Add'}
+                </button>
+              </form>
+              <h3 className="text-sm font-medium text-bark-800 mb-2">Current members</h3>
+              <ul className="space-y-2">
+                {members.map((m) => (
+                  <li key={m.userId} className="flex items-center justify-between gap-2 py-2 border-b border-bark-100 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-bark-800">{m.displayName}</span>
+                      <span className="block text-bark-500 text-xs truncate">{m.email}</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-bark-100 text-bark-700 text-xs shrink-0">{m.role}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

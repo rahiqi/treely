@@ -80,6 +80,18 @@ export function putTreeChart(treeId: number, nodes: FamilyChartNode[]) {
   });
 }
 
+// Tree members (Creator can add Contributor/Visitor)
+export type TreeMemberDto = { userId: number; email: string; displayName: string; role: string; joinedAtUtc: string };
+export function getTreeMembers(treeId: number) {
+  return api<TreeMemberDto[]>(`/api/trees/${treeId}/members`);
+}
+export function addTreeMember(treeId: number, email: string, role: 'Contributor' | 'Visitor') {
+  return api<TreeMemberDto[]>('/api/trees/' + treeId + '/members', {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  });
+}
+
 // Persons
 export type PersonDto = {
   id: number;
