@@ -32,6 +32,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Use nginx proxy inside container, browser hits same origin
+        VITE_API_URL: ${VITE_API_URL:-}
     ports:
       - "801:80"
     depends_on:

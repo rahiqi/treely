@@ -1,10 +1,18 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+
+# Install dependencies
 COPY package.json package-lock.json* ./
 RUN npm install
+
+# Copy source
 COPY . .
-# Empty so browser uses same origin; nginx proxies /api to backend
-ENV VITE_API_URL=
+
+# Build-time API base URL for Vite (can be overridden via build args)
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Build React app
 RUN npm run build
 
 FROM nginx:alpine
