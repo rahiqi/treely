@@ -136,6 +136,12 @@ export default function TreeView() {
     const chart = f3.createChart('#family-chart-mount', nodesForChart as f3.Data);
     chartRef.current = chart;
 
+    function escapeHtml(text: string) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     chart
       .setTransitionTime(1000)
       .setCardXSpacing(250)
@@ -146,10 +152,20 @@ export default function TreeView() {
 
     const f3Card = chart
       .setCardHtml()
-      .setCardDisplay([
-        ['first name', 'last name'],
-        ['birthday'],
-      ])
+      .setCardInnerHtmlCreator((d: { data?: Record<string, unknown> }) => {
+        const data = (d && d.data) || {};
+        const firstName = (data['first name'] ?? '') as string;
+        const lastName = (data['last name'] ?? '') as string;
+        const birthday = (data['birthday'] ?? '') as string;
+        const personId = data['personId'] != null ? String(data['personId']) : '';
+        const name = [firstName, lastName].filter(Boolean).join(' ') || '—';
+        return `
+          <div class="treely-card-inner" style="padding: 10px 12px; text-align: center; min-width: 140px;">
+            <div class="treely-card-name" style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(name)}</div>
+            ${birthday ? `<div class="treely-card-meta" style="font-size: 0.85em; opacity: 0.9; margin-bottom: 8px;">${escapeHtml(String(birthday))}</div>` : ''}
+            ${personId ? `<button type="button" class="treely-see-profile" data-person-id="${escapeHtml(personId)}" style="font-size: 12px; padding: 4px 10px; cursor: pointer; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; color: inherit;">See profile</button>` : ''}
+          </div>`;
+      })
       .setMiniTree(true)
       .setStyle('imageRect')
       .setOnHoverPathToMain();
@@ -184,29 +200,49 @@ export default function TreeView() {
       }
     }
 
-    if (!canEdit) {
-      chart.setAfterUpdate(() => {
-        const mount = document.getElementById('family-chart-mount');
-        if (!mount) return;
-        const cards = mount.querySelectorAll('[data-id]');
-        cards.forEach((card) => {
-          if ((card as HTMLElement).dataset.treelyBound) return;
-          const idAttr = (card as HTMLElement).getAttribute('data-id');
-          if (!idAttr) return;
-          const personId = personIdMapRef.current.get(idAttr);
-          if (personId == null) return;
-          (card as HTMLElement).style.cursor = 'pointer';
-          (card as HTMLElement).dataset.treelyBound = '1';
-          card.addEventListener('click', () => navigateToPerson(personId));
+    // "See profile" button: delegated click so it doesn't open EditTree when in edit mode
+    const mountEl = document.getElementById('family-chart-mount');
+    if (mountEl) {
+      const onMountClick = (e: Event) => {
+        const target = (e.target as HTMLElement).closest('.treely-see-profile');
+        if (!target) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const personId = (target as HTMLElement).getAttribute('data-person-id');
+        if (personId) navigate(`/person/${personId}`);
+      };
+      mountEl.addEventListener('click', onMountClick);
+
+      if (!canEdit) {
+        chart.setAfterUpdate(() => {
+          const mount = document.getElementById('family-chart-mount');
+          if (!mount) return;
+          const cards = mount.querySelectorAll('[data-id]');
+          cards.forEach((card) => {
+            if ((card as HTMLElement).dataset.treelyBound) return;
+            const idAttr = (card as HTMLElement).getAttribute('data-id');
+            if (!idAttr) return;
+            const personId = personIdMapRef.current.get(idAttr);
+            if (personId == null) return;
+            (card as HTMLElement).style.cursor = 'pointer';
+            (card as HTMLElement).dataset.treelyBound = '1';
+            card.addEventListener('click', () => navigateToPerson(personId));
+          });
         });
-      });
+      }
+
+      return () => {
+        mountEl.removeEventListener('click', onMountClick);
+        chartRef.current = null;
+        editTreeRef.current = null;
+      };
     }
 
     return () => {
       chartRef.current = null;
       editTreeRef.current = null;
     };
-  }, [chartNodes, canEdit, navigateToPerson]);
+  }, [chartNodes, canEdit, navigateToPerson, navigate]);
 
   const emptyTree = chartNodes.length === 0;
 
