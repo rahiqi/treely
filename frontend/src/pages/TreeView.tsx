@@ -24,6 +24,7 @@ export default function TreeView() {
   const [adding, setAdding] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [emptyTree, setEmptyTree] = useState(false);
+  const [chartNodes, setChartNodes] = useState<Array<{ id: string; data: Record<string, unknown>; rels: { parents: string[]; spouses: string[]; children: string[] } }>>([]);
   const id = treeId ? parseInt(treeId, 10) : NaN;
 
   const refreshTree = useCallback(() => setRefreshTrigger((r) => r + 1), []);
@@ -35,64 +36,38 @@ export default function TreeView() {
     [navigate]
   );
 
+  // Fetch tree and chart data (do not depend on containerRef – it's not in DOM while loading)
   useEffect(() => {
-    if (!id || !containerRef.current) return;
+    if (!id || isNaN(id)) return;
     let cancelled = false;
     setLoading(true);
     setError('');
+    setChartNodes([]);
     Promise.all([getTree(id), getTreeChart(id)])
       .then(([tree, chartData]) => {
         if (cancelled) return;
         setTreeName(tree.name);
         setCanEdit(tree.yourRole === 'Creator' || tree.yourRole === 'Contributor');
         setEmptyTree(chartData.length === 0);
-        const el = document.getElementById('family-chart-mount');
-        if (!el) return;
-        el.innerHTML = '';
+        setLoading(false);
+        if (chartData.length === 0) return;
         const map = new Map<string, number>();
         chartData.forEach((n) => {
           const pid = (n.data as { personId?: number }).personId;
           if (pid != null) map.set(n.id, pid);
         });
         personIdMapRef.current = map;
-        const nodes = chartData.map((n) => ({
-          id: n.id,
-          data: n.data,
-          rels: {
-            parents: n.rels?.parents ?? [],
-            spouses: n.rels?.spouses ?? [],
-            children: n.rels?.children ?? [],
-          },
-        }));
-        if (nodes.length === 0) {
-          setLoading(false);
-          return;
-        }
-        const chart = f3.createChart('#family-chart-mount', nodes as f3.Data);
-        chartRef.current = chart;
-        chart
-          .setCardHtml()
-          .setCardDisplay([
-            ['first name', 'last name'],
-            ['birthday'],
-          ]);
-        chart.setAfterUpdate(() => {
-          const mount = document.getElementById('family-chart-mount');
-          if (!mount) return;
-          const cards = mount.querySelectorAll('[data-id]');
-          cards.forEach((card) => {
-            if ((card as HTMLElement).dataset.treelyBound) return;
-            const idAttr = (card as HTMLElement).getAttribute('data-id');
-            if (!idAttr) return;
-            const personId = personIdMapRef.current.get(idAttr);
-            if (personId == null) return;
-            (card as HTMLElement).style.cursor = 'pointer';
-            (card as HTMLElement).dataset.treelyBound = '1';
-            card.addEventListener('click', () => navigateToPerson(personId));
-          });
-        });
-        chart.updateTree({ initial: true });
-        setLoading(false);
+        setChartNodes(
+          chartData.map((n) => ({
+            id: n.id,
+            data: n.data,
+            rels: {
+              parents: n.rels?.parents ?? [],
+              spouses: n.rels?.spouses ?? [],
+              children: n.rels?.children ?? [],
+            },
+          }))
+        );
       })
       .catch((err) => {
         if (!cancelled) {
@@ -102,9 +77,43 @@ export default function TreeView() {
       });
     return () => {
       cancelled = true;
+    };
+  }, [id, refreshTrigger]);
+
+  // Mount chart after we have nodes and the chart container is in the DOM
+  useEffect(() => {
+    if (chartNodes.length === 0) return;
+    const el = document.getElementById('family-chart-mount');
+    if (!el) return;
+    el.innerHTML = '';
+    const chart = f3.createChart('#family-chart-mount', chartNodes as f3.Data);
+    chartRef.current = chart;
+    chart
+      .setCardHtml()
+      .setCardDisplay([
+        ['first name', 'last name'],
+        ['birthday'],
+      ]);
+    chart.setAfterUpdate(() => {
+      const mount = document.getElementById('family-chart-mount');
+      if (!mount) return;
+      const cards = mount.querySelectorAll('[data-id]');
+      cards.forEach((card) => {
+        if ((card as HTMLElement).dataset.treelyBound) return;
+        const idAttr = (card as HTMLElement).getAttribute('data-id');
+        if (!idAttr) return;
+        const personId = personIdMapRef.current.get(idAttr);
+        if (personId == null) return;
+        (card as HTMLElement).style.cursor = 'pointer';
+        (card as HTMLElement).dataset.treelyBound = '1';
+        card.addEventListener('click', () => navigateToPerson(personId));
+      });
+    });
+    chart.updateTree({ initial: true });
+    return () => {
       chartRef.current = null;
     };
-  }, [id, navigateToPerson, refreshTrigger]);
+  }, [chartNodes, navigateToPerson]);
 
   async function handleAddPerson(e: React.FormEvent) {
     e.preventDefault();
