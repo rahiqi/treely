@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import * as f3 from 'family-chart';
-import 'family-chart/dist/styles/family-chart.css';
+import 'family-chart/styles/family-chart.css';
 import { useAuth } from '../contexts/AuthContext';
 import { getTree, getTreeChart, createPerson } from '../api';
 
