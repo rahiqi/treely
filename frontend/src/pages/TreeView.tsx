@@ -150,24 +150,44 @@ export default function TreeView() {
       .setShowSiblingsOfMain(false)
       .setOrientationVertical();
 
+    /**
+     * family-chart passes TreeDatum: d.data = { id, data: { "first name", ... }, rels } (same as d.data.data in docs).
+     * Fallbacks cover flat shapes if the library passes the node directly.
+     */
+    function getPersonDataFromDatum(d: unknown): Record<string, unknown> {
+      if (d == null || typeof d !== 'object') return {};
+      const root = d as Record<string, unknown>;
+      if ('first name' in root || 'personId' in root || 'gender' in root) {
+        return root;
+      }
+      const outer = root.data as Record<string, unknown> | undefined;
+      if (!outer) return {};
+      if (outer.data && typeof outer.data === 'object' && !Array.isArray(outer.data)) {
+        return outer.data as Record<string, unknown>;
+      }
+      if ('first name' in outer || 'personId' in outer) return outer;
+      return {};
+    }
+
     const f3Card = chart
       .setCardHtml()
-      .setCardInnerHtmlCreator((d: { data?: Record<string, unknown> }) => {
-        const data = (d && d.data) || {};
+      .setCardInnerHtmlCreator((d: unknown) => {
+        const data = getPersonDataFromDatum(d);
         const firstName = (data['first name'] ?? '') as string;
         const lastName = (data['last name'] ?? '') as string;
         const birthday = (data['birthday'] ?? '') as string;
         const personId = data['personId'] != null ? String(data['personId']) : '';
         const name = [firstName, lastName].filter(Boolean).join(' ') || '—';
         return `
-          <div class="treely-card-inner" style="padding: 10px 12px; text-align: center; min-width: 140px;">
-            <div class="treely-card-name" style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(name)}</div>
-            ${birthday ? `<div class="treely-card-meta" style="font-size: 0.85em; opacity: 0.9; margin-bottom: 8px;">${escapeHtml(String(birthday))}</div>` : ''}
-            ${personId ? `<button type="button" class="treely-see-profile" data-person-id="${escapeHtml(personId)}" style="font-size: 12px; padding: 4px 10px; cursor: pointer; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; color: inherit;">See profile</button>` : ''}
+          <div class="treely-card-inner" style="padding: 10px 12px; text-align: center; min-width: 160px; color: #fff; font-family: system-ui, sans-serif;">
+            <div class="treely-card-name" style="font-weight: 600; margin-bottom: 4px; color: #fff;">${escapeHtml(name)}</div>
+            ${birthday ? `<div class="treely-card-meta" style="font-size: 0.85em; color: rgba(255,255,255,0.9); margin-bottom: 8px;">${escapeHtml(String(birthday))}</div>` : ''}
+            ${personId ? `<button type="button" class="treely-see-profile" data-person-id="${escapeHtml(personId)}" style="font-size: 12px; padding: 4px 10px; cursor: pointer; background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; color: #fff;">See profile</button>` : ''}
           </div>`;
       })
       .setMiniTree(true)
-      .setStyle('imageRect')
+      /* 'rect' fits custom inner HTML; 'imageRect' can leave a blank image band above the text strip */
+      .setStyle('rect')
       .setOnHoverPathToMain();
 
     if (canEdit) {

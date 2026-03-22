@@ -37,3 +37,14 @@ body {
   z-index: 10;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* HTML cards live inside SVG foreignObject — ensure text/buttons are visible */
+.f3 foreignObject .treely-card-inner {
+  font-size: 14px;
+  line-height: 1.35;
+  color: #fff !important;
+  -webkit-font-smoothing: antialiased;
+}
+.f3 foreignObject .treely-see-profile {
+  color: #fff !important;
+}
